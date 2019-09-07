@@ -1,0 +1,80 @@
+package com.subrato.packages.solace.TopicToQueueMapping.config;
+
+import com.solacesystems.jcsmp.*;
+import com.subrato.packages.solace.TopicToQueueMapping.pojos.RouterConfig;
+import com.subrato.packages.solace.TopicToQueueMapping.pojos.SessionResponse;
+import com.subrato.packages.solace.TopicToQueueMapping.pojos.StatusReport;
+
+public class MessageRouter {
+	
+	private JCSMPProperties properties;
+	private JCSMPSession session = null;
+	
+	public MessageRouter(RouterConfig config) {
+		properties = new JCSMPProperties();
+		
+		properties.setProperty(JCSMPProperties.HOST, config.getHost());
+		properties.setProperty(JCSMPProperties.USERNAME, config.getUsername());
+		properties.setProperty(JCSMPProperties.VPN_NAME, config.getVpn_name());
+		properties.setProperty(JCSMPProperties.PASSWORD, config.getPassword());
+	}
+
+	private StatusReport addProvision(Queue queue){
+		EndpointProperties endpointProps = new EndpointProperties();
+		endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
+		endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
+
+		try {
+			session.provision(queue, endpointProps, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
+		} catch (JCSMPException e) {
+			return new StatusReport("Failed To Add Provision: " + e.getMessage(), true);
+		}
+
+		return new StatusReport("Success", true);
+	}
+
+	public StatusReport connect(Queue queue) {
+		String response;
+		boolean status = false;
+
+		if( session != null ){
+			response = "Session Already Active.";
+			return new StatusReport(response, true);
+		}
+		
+		try {
+			session = JCSMPFactory.onlyInstance().createSession(properties);
+			if(queue != null){
+				addProvision(queue);
+			}
+			session.connect();
+			response = "Success";
+			status = true;
+		} catch (InvalidPropertiesException e) {
+			session = null;
+			response = "Session Instance Creation Failed - " + e.getMessage();
+		} catch (JCSMPException e) {
+			session = null;
+			response = "Failed To Connect " + e.getMessage();
+		}
+		
+		return new StatusReport(response, status);
+	}
+
+	public StatusReport kill(){
+		if( session != null ){
+			session.closeSession();
+			session = null;
+			return new StatusReport("Session Closed", true);
+		}
+
+		return new StatusReport("Session not initialized.", true);
+	}
+
+	public JCSMPProperties getProperties() {
+		return properties;
+	}
+	public JCSMPSession getSession() {
+		return session;
+	}
+}
