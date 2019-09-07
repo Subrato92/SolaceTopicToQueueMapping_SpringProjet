@@ -15,6 +15,7 @@ public class MessageRouter {
 		
 		properties.setProperty(JCSMPProperties.HOST, config.getHost());
 		properties.setProperty(JCSMPProperties.USERNAME, config.getUsername());
+		properties.setProperty(JCSMPProperties.PASSWORD, config.getPassword());
 		properties.setProperty(JCSMPProperties.VPN_NAME, config.getVpn_name());
 		//--- Prop to avoid exception or Error on mapping an existing topic to queue
 		properties.setProperty(JCSMPProperties.IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, true);
@@ -34,8 +35,8 @@ public class MessageRouter {
 		return new StatusReport("Success", true);
 	}
 
-	public StatusReport connect(Queue queue) {
-		String response;
+	public StatusReport connect(Queue queue, String topicToQueue, Topic topic) {
+		String response = "";
 		boolean status = false;
 
 		if( session != null ){
@@ -45,11 +46,17 @@ public class MessageRouter {
 		
 		try {
 			session = JCSMPFactory.onlyInstance().createSession(properties);
+			response = "Session created with properties... ";
 			if(queue != null){
 				addProvision(queue);
+				response = response.concat("Registering queue for persistance... ");
+			}else if(topicToQueue != null){
+				Queue persistingQueue = JCSMPFactory.onlyInstance().createQueue(topicToQueue);
+				session.addSubscription(persistingQueue, topic, JCSMPSession.WAIT_FOR_CONFIRM);
+				response = response.concat("Topic Registered to queue 'topicToQueue'... ");
 			}
 			session.connect();
-			response = "Success";
+			response = response.concat("Success");
 			status = true;
 		} catch (InvalidPropertiesException e) {
 			session = null;

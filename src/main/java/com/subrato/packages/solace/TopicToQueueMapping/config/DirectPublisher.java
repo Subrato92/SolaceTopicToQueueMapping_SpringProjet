@@ -12,17 +12,25 @@ public class DirectPublisher {
     private String topicName = null;
     private TextMessage textMessage = null;
     private MessageRouter router = null;
+    private String queueName;
 
     private Logger log = LoggerFactory.getLogger(DirectPublisher.class);
 
-    public DirectPublisher (MessageRouter router, String topicName){
+    public DirectPublisher (MessageRouter router, String topicName, String queueName){
         this.router = router;
         this.topicName = topicName;
+        this.queueName = queueName;
     }
 
     public StatusReport initialize(){
-        if(router == null || router.getSession() == null || topicName == null){
-            return new StatusReport("Router/Session/TopicName is null", false);
+        if(router == null || topicName == null){
+            return new StatusReport("Router/TopicName is null", false);
+        }
+
+        topic = JCSMPFactory.onlyInstance().createTopic(topicName);
+        StatusReport sessionStatusReport = router.connect(null, queueName, topic);
+        if( !sessionStatusReport.isStatus() ){
+            return sessionStatusReport;
         }
 
         try {
@@ -42,7 +50,6 @@ public class DirectPublisher {
             return new StatusReport(e.getMessage(), false);
         }
 
-        topic = JCSMPFactory.onlyInstance().createTopic(topicName);
         textMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
 
         return new StatusReport("Successfully Initialized.", true);

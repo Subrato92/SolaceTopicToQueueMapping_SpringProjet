@@ -40,12 +40,32 @@ public class QueueProducer {
         if( !reportOfRouterConnectivity.isStatus() ) {
             return reportOfRouterConnectivity;
         }
-        sessionActive = true;
+
+        if(capabilityCheck(router.getSession())) {
+            sessionActive = true;
+        }else{
+            return new StatusReport("Session Lacks capability", false);
+        }
 
         this.latch = new CountDownLatch(1);;
         prod = router.getSession().getMessageProducer(new PublisherCallback(latch));
 
         return new StatusReport("Success", true);
+    }
+
+    private boolean capabilityCheck(JCSMPSession session){
+        log.info("Conducting Check for Session's Capability...");
+        if (session.isCapable(CapabilityType.PUB_GUARANTEED) &&
+                session.isCapable(CapabilityType.SUB_FLOW_GUARANTEED) &&
+                session.isCapable(CapabilityType.ENDPOINT_MANAGEMENT) &&
+                session.isCapable(CapabilityType.QUEUE_SUBSCRIPTIONS)) {
+            log.info("All required capabilities supported!");
+        } else {
+            log.info("Capabilities not met!");
+            return false;
+        }
+
+        return true;
     }
 
     public String sendMsg(String message) {
