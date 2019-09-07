@@ -16,7 +16,8 @@ public class MessageRouter {
 		properties.setProperty(JCSMPProperties.HOST, config.getHost());
 		properties.setProperty(JCSMPProperties.USERNAME, config.getUsername());
 		properties.setProperty(JCSMPProperties.VPN_NAME, config.getVpn_name());
-		properties.setProperty(JCSMPProperties.PASSWORD, config.getPassword());
+		//--- Prop to avoid exception or Error on mapping an existing topic to queue
+		properties.setProperty(JCSMPProperties.IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, true);
 	}
 
 	private StatusReport addProvision(Queue queue){
