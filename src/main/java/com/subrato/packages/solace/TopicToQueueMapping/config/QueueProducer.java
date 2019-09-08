@@ -28,14 +28,14 @@ public class QueueProducer {
 
     private Logger log = LoggerFactory.getLogger(Producer.class);
 
-    public StatusReport initialize() throws JCSMPException {
+    public StatusReport initialize() {
 
         if(router == null || queueName == null){
             return new StatusReport("Router/QueueName is null", false);
         }
 
         queue = JCSMPFactory.onlyInstance().createQueue(queueName);
-        StatusReport reportOfRouterConnectivity = router.connect(queue);
+        StatusReport reportOfRouterConnectivity = router.connect(queue, null, null);
 
         if( !reportOfRouterConnectivity.isStatus() ) {
             return reportOfRouterConnectivity;
@@ -48,7 +48,11 @@ public class QueueProducer {
         }
 
         this.latch = new CountDownLatch(1);;
-        prod = router.getSession().getMessageProducer(new PublisherCallback(latch));
+        try {
+            prod = router.getSession().getMessageProducer(new PublisherCallback(latch));
+        } catch (JCSMPException e) {
+            return new StatusReport(e.getMessage(), false);
+        }
 
         return new StatusReport("Success", true);
     }

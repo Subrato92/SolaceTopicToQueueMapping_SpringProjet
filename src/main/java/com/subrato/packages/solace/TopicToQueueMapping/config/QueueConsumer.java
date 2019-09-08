@@ -33,7 +33,7 @@ public class QueueConsumer {
         }
 
         queue = JCSMPFactory.onlyInstance().createQueue(QueueName);
-        StatusReport reportOfRouterConnectivity = router.connect(queue);
+        StatusReport reportOfRouterConnectivity = router.connect(queue, null, null);
         if(!reportOfRouterConnectivity.isStatus()){
             return reportOfRouterConnectivity;
         }
@@ -53,11 +53,11 @@ public class QueueConsumer {
                 @Override
                 public void onReceive(BytesXMLMessage msg) {
                     if (msg instanceof TextMessage) {
-                        log.info("TextMessage received: " + ((TextMessage) msg).getText());
+                        log.info("@Queue : TextMessage received: " + ((TextMessage) msg).getText());
                         messageList.add(((TextMessage) msg).getText());
                     } else {
-                        log.info("Message received...");
-                        log.info("Message Dump: ");
+                        log.info("@Queue : Message received...");
+                        log.info("@Queue : Message Dump: ");
                         log.info(msg.dump());
                     }
 
@@ -70,7 +70,7 @@ public class QueueConsumer {
 
                 @Override
                 public void onException(JCSMPException e) {
-                    System.out.printf("Consumer received exception: %s%n", e);
+                    System.out.printf("@Queue : Consumer received exception: %s%n", e);
                     latch.countDown();
                 }
             },flowProperties, endpoint_props);

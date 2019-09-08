@@ -1,11 +1,9 @@
 package com.subrato.packages.solace.TopicToQueueMapping.controller;
 
-import com.subrato.packages.solace.TopicToQueueMapping.config.DirectPublisher;
-import com.subrato.packages.solace.TopicToQueueMapping.config.MessageRouter;
-import com.subrato.packages.solace.TopicToQueueMapping.pojos.MessagePayload;
-import com.subrato.packages.solace.TopicToQueueMapping.pojos.RouterConfig;
-import com.subrato.packages.solace.TopicToQueueMapping.pojos.StatusReport;
-import com.subrato.packages.solace.TopicToQueueMapping.pojos.TopicPublisherRequest;
+import com.subrato.packages.solace.TopicToQueueMapping.config.*;
+import com.subrato.packages.solace.TopicToQueueMapping.pojos.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
@@ -21,6 +19,11 @@ public class RestEndPoints {
     private RouterConfig defaultRouterConfig = null;
     private String defaultQueueName = null;
     private HashMap<String, DirectPublisher> lstOfDirectPublishers = new HashMap<String, DirectPublisher>();
+    private HashMap<String, DirectConsumer> lstOfDirectConsumers = new HashMap<String, DirectConsumer>();
+    private HashMap<String, QueueProducer> lstOfQueuePublishers = new HashMap<String, QueueProducer>();
+    private HashMap<String, QueueConsumer> lstOfQueueConsumers = new HashMap<String, QueueConsumer>();
+
+    private Logger log = LoggerFactory.getLogger(RestEndPoints.class);
 
     @PostMapping(
             value = "/routerconfig/setdefault",
@@ -63,11 +66,11 @@ public class RestEndPoints {
     }
 
     @PostMapping(
-            value = "/topicpublisher/add",
+            value = "/topicpubsub/add",
             produces = MediaType.APPLICATION_JSON_VALUE,
             consumes = MediaType.APPLICATION_JSON_VALUE
     )
-    public @ResponseBody StatusReport createTopicPublisher(@RequestBody TopicPublisherRequest payload){
+    public @ResponseBody StatusReport createTopicPubSub(@RequestBody TopicPublisherRequest payload){
 
         if( payload.getRouterConfig().getTopicName() == null ){
             return new StatusReport("[MissingTopicName]", false);
@@ -75,6 +78,7 @@ public class RestEndPoints {
         MessageRouter router = null;
         boolean isValid = checkForValidity(payload.getRouterConfig());
         DirectPublisher publisher = null;
+        DirectConsumer consumer = null;
 
         if( !isValid && defaultRouterConfig == null ){
             return new StatusReport("Fields Missing. No Default Router Set.", false);
@@ -92,15 +96,143 @@ public class RestEndPoints {
             publisher = new DirectPublisher(router, payload.getRouterConfig().getTopicName(), defaultQueueName);
         }
 
+        consumer = new DirectConsumer(router, payload.getRouterConfig().getTopicName());
+        StatusReport pubInitializerReport = null;
+        StatusReport subInitializerReport = null;
+
         if(publisher != null){
-            lstOfDirectPublishers.put(payload.getRouterConfig().getTopicName(), publisher);
+            log.info("Initializing Topic Publisher...");
+            pubInitializerReport = publisher.initialize();
+
+            if(pubInitializerReport.isStatus()) {
+                lstOfDirectPublishers.put(payload.getRouterConfig().getTopicName(), publisher);
+            }else{
+                return pubInitializerReport;
+            }
+        }
+
+        if(consumer != null){
+            log.info("Initializing Topic Consumer...");
+            subInitializerReport = consumer.initialize();
+
+            if(subInitializerReport.isStatus()){
+                lstOfDirectConsumers.put(payload.getRouterConfig().getTopicName(), consumer);
+            }else{
+                publisher.close();
+                lstOfDirectPublishers.remove(payload.getRouterConfig().getTopicName());
+                return subInitializerReport;
+            }
         }
 
         return new StatusReport("Success", true);
     }
 
-    public @ResponseBody StatusReport sendMessage(@RequestBody MessagePayload message){
+    @PostMapping(
+            value = "/queuepubsub/add",
+            produces = MediaType.APPLICATION_JSON_VALUE,
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public @ResponseBody StatusReport createQueuePubSub(@RequestBody QueuePubSubInitializer payload){
 
+        if( payload.getRouterConfig() == null && !payload.isDefaultConfig() ){
+            return new StatusReport("[MissingRouterConfig]", false);
+        }else if(payload.isDefaultConfig() && defaultRouterConfig == null ) {
+            return new StatusReport("DefaultRouterConfig Missing. Add Default Router Config.", false);
+        }
+
+        if(payload.getQueueName() == null && !payload.isDefaultQueue()){
+            return new StatusReport("QueueName Missing.", false);
+        }
+
+        MessageRouter router = null;
+        if(payload.isDefaultConfig()){
+            router = new MessageRouter(defaultRouterConfig);
+        }else{
+            boolean isValid = checkForValidity(payload.getRouterConfig());
+            if(isValid){
+                router = new MessageRouter(payload.getRouterConfig());
+            }else{
+                return new StatusReport("Router Config Fields Missing.", false);
+            }
+        }
+
+        QueueProducer publisher = null;
+        QueueConsumer consumer = null;
+
+        if(payload.isDefaultQueue()){
+            publisher = new QueueProducer(router, defaultQueueName);
+            consumer = new QueueConsumer(router, defaultQueueName);
+        }else{
+            publisher = new QueueProducer(router, payload.getQueueName());
+            consumer = new QueueConsumer(router, payload.getQueueName());
+        }
+
+        StatusReport publisherInitializerStatus;
+        StatusReport consumerInitializerStatus;
+
+        if(publisher != null){
+            log.info("Initializing Queue Publisher...");
+            publisherInitializerStatus = publisher.initialize();
+
+            if(publisherInitializerStatus.isStatus() && payload.isDefaultQueue()){
+                lstOfQueuePublishers.put(defaultQueueName, publisher);
+            }else if( publisherInitializerStatus.isStatus() ){
+                lstOfQueuePublishers.put(payload.getQueueName(), publisher);
+            }else{
+                return publisherInitializerStatus;
+            }
+        }
+
+        if(consumer != null){
+            log.info("Initializing Queue Consumer...");
+            consumerInitializerStatus = consumer.initialize();
+
+            if(consumerInitializerStatus.isStatus() && payload.isDefaultQueue()){
+                lstOfQueueConsumers.put(defaultQueueName, consumer);
+            }else if( consumerInitializerStatus.isStatus() ){
+                lstOfQueueConsumers.put(payload.getQueueName(), consumer);
+            }else{
+                lstOfQueuePublishers.remove(payload.getQueueName());
+                return consumerInitializerStatus;
+            }
+        }
+
+        return new StatusReport("Success", true);
+    }
+
+
+    @PostMapping(
+            value = "topic/sendmsg",
+            produces = MediaType.APPLICATION_JSON_VALUE,
+            consumes = MediaType.APPLICATION_JSON_VALUE
+    )
+    public @ResponseBody StatusReport sendMessageToTopic(@RequestBody MessagePayload message){
+
+        if( message.getTopic() == null ){
+            return new StatusReport("Topic Null", false);
+        }else if(message.getMessage() == null){
+            return new StatusReport("Message Null", false);
+        }
+
+        if(lstOfDirectPublishers.containsKey(message.getTopic())){
+            DirectPublisher publisher = lstOfDirectPublishers.get(message.getTopic());
+            publisher.publish(message.getMessage());
+        }else{
+            return new StatusReport("No Publisher For the Topic...", false);
+        }
+
+        return new StatusReport("Success", true);
+    }
+
+    public @ResponseBody StatusReport getMessageFromTopic(){
+        return new StatusReport("Success", true);
+    }
+
+    public @ResponseBody StatusReport sendMessageToQueue(){
+        return new StatusReport("Success", true);
+    }
+
+    public @ResponseBody StatusReport getMessageFromQueue(){
         return new StatusReport("Success", true);
     }
 

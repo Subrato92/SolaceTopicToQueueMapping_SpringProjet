@@ -29,6 +29,7 @@ public class DirectPublisher {
 
         topic = JCSMPFactory.onlyInstance().createTopic(topicName);
         StatusReport sessionStatusReport = router.connect(null, queueName, topic);
+
         if( !sessionStatusReport.isStatus() ){
             return sessionStatusReport;
         }

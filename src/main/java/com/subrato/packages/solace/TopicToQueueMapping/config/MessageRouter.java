@@ -47,14 +47,16 @@ public class MessageRouter {
 		try {
 			session = JCSMPFactory.onlyInstance().createSession(properties);
 			response = "Session created with properties... ";
+
 			if(queue != null){
 				addProvision(queue);
 				response = response.concat("Registering queue for persistance... ");
-			}else if(topicToQueue != null){
+			}else if(topicToQueue != null && topic != null){
 				Queue persistingQueue = JCSMPFactory.onlyInstance().createQueue(topicToQueue);
 				session.addSubscription(persistingQueue, topic, JCSMPSession.WAIT_FOR_CONFIRM);
 				response = response.concat("Topic Registered to queue 'topicToQueue'... ");
 			}
+
 			session.connect();
 			response = response.concat("Success");
 			status = true;
