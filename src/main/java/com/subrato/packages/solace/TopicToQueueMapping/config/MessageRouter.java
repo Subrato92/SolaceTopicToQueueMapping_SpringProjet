@@ -2,7 +2,6 @@ package com.subrato.packages.solace.TopicToQueueMapping.config;
 
 import com.solacesystems.jcsmp.*;
 import com.subrato.packages.solace.TopicToQueueMapping.pojos.RouterConfig;
-import com.subrato.packages.solace.TopicToQueueMapping.pojos.SessionResponse;
 import com.subrato.packages.solace.TopicToQueueMapping.pojos.StatusReport;
 
 public class MessageRouter {
@@ -18,10 +17,12 @@ public class MessageRouter {
 		properties.setProperty(JCSMPProperties.PASSWORD, config.getPassword());
 		properties.setProperty(JCSMPProperties.VPN_NAME, config.getVpn_name());
 		//--- Prop to avoid exception or Error on mapping an existing topic to queue
-		properties.setProperty(JCSMPProperties.IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, true);
+		if(config.isLinkTopicToQueue()) {
+			properties.setProperty(JCSMPProperties.IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, true);
+		}
 	}
 
-	private StatusReport addProvision(Queue queue){
+	private StatusReport addProvisionForQueue(Queue queue){
 		EndpointProperties endpointProps = new EndpointProperties();
 		endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
 		endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
@@ -49,7 +50,7 @@ public class MessageRouter {
 			response = "Session created with properties... ";
 
 			if(queue != null){
-				addProvision(queue);
+				addProvisionForQueue(queue);
 				response = response.concat("Registering queue for persistance... ");
 			}else if(topicToQueue != null && topic != null){
 				Queue persistingQueue = JCSMPFactory.onlyInstance().createQueue(topicToQueue);

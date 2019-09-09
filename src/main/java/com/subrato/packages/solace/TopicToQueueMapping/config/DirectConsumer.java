@@ -55,7 +55,7 @@ public class DirectConsumer {
         return new StatusReport("Successfully Initialized.", true);
     }
 
-    public String getMessage() throws JCSMPException {
+    public String getMessage() {
 
         StringBuilder sb = new StringBuilder();
 

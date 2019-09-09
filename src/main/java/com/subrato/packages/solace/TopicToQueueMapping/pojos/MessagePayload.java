@@ -1,14 +1,14 @@
 package com.subrato.packages.solace.TopicToQueueMapping.pojos;
 
 public class MessagePayload {
-    private String topic;
+    private String ref;
     private String message;
 
-    public String getTopic() {
-        return topic;
+    public String getRef() {
+        return ref;
     }
-    public void setTopic(String topic) {
-        this.topic = topic;
+    public void setRef(String ref) {
+        this.ref = ref;
     }
     public String getMessage() {
         return message;
