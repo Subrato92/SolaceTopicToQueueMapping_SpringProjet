@@ -8,15 +8,7 @@ public class RouterConfig implements Serializable {
 	private String username;
 	private String vpn_name;
 	private String password;
-	private String topicName;
-	private boolean linkTopicToQueue;
 
-	public String getTopicName() {
-		return topicName;
-	}
-	public void setTopicName(String topicName) {
-		this.topicName = topicName;
-	}
 	public String getHost() {
 		return host;
 	}
@@ -40,11 +32,5 @@ public class RouterConfig implements Serializable {
 	}
 	public void setPassword(String password) {
 		this.password = password;
-	}
-	public boolean isLinkTopicToQueue() {
-		return linkTopicToQueue;
-	}
-	public void setLinkTopicToQueue(boolean linkTopicToQueue) {
-		this.linkTopicToQueue = linkTopicToQueue;
 	}
 }

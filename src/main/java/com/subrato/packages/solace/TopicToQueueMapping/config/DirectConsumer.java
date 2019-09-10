@@ -22,8 +22,13 @@ public class DirectConsumer {
 
     public StatusReport initialize(){
 
-        if( router != null || router.getSession() != null || topicName == null){
-            return new StatusReport("Router/Session/TopicName is null", false);
+        if( router == null || topicName == null){
+            return new StatusReport("Router/TopicName is null", false);
+        }
+
+        StatusReport sessionStatusReport = router.connect(null, null, null );
+        if( !sessionStatusReport.isStatus() ){
+            return sessionStatusReport;
         }
 
         try {

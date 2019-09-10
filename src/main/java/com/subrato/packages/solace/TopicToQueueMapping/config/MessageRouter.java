@@ -16,10 +16,6 @@ public class MessageRouter {
 		properties.setProperty(JCSMPProperties.USERNAME, config.getUsername());
 		properties.setProperty(JCSMPProperties.PASSWORD, config.getPassword());
 		properties.setProperty(JCSMPProperties.VPN_NAME, config.getVpn_name());
-		//--- Prop to avoid exception or Error on mapping an existing topic to queue
-		if(config.isLinkTopicToQueue()) {
-			properties.setProperty(JCSMPProperties.IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, true);
-		}
 	}
 
 	private StatusReport addProvisionForQueue(Queue queue){
@@ -44,15 +40,26 @@ public class MessageRouter {
 			response = "Session Already Active.";
 			return new StatusReport(response, true);
 		}
-		
+
+		//--- IMPROVISATION (1) : Prop to avoid exception or Error on mapping an existing topic to queue
+		if(topicToQueue != null && topic != null) {
+			properties.setProperty(JCSMPProperties.IGNORE_DUPLICATE_SUBSCRIPTION_ERROR, true);
+		}
+
 		try {
 			session = JCSMPFactory.onlyInstance().createSession(properties);
 			response = "Session created with properties... ";
 
-			if(queue != null){
+			if(queue != null){										//--- IMPROVISATION (2) : Session For Queue Pub-Sub
 				addProvisionForQueue(queue);
 				response = response.concat("Registering queue for persistance... ");
-			}else if(topicToQueue != null && topic != null){
+			}else if(topicToQueue != null && topic != null){		//--- IMPROVISATION (3) : Registering Topic to Queue
+
+				StatusReport report = checkSessionEligibility();
+				if(!report.isStatus()){
+					return report;
+				}
+
 				Queue persistingQueue = JCSMPFactory.onlyInstance().createQueue(topicToQueue);
 				session.addSubscription(persistingQueue, topic, JCSMPSession.WAIT_FOR_CONFIRM);
 				response = response.concat("Topic Registered to queue 'topicToQueue'... ");
@@ -64,7 +71,11 @@ public class MessageRouter {
 		} catch (InvalidPropertiesException e) {
 			session = null;
 			response = "Session Instance Creation Failed - " + e.getMessage();
-		} catch (JCSMPException e) {
+		} catch (JCSMPErrorResponseException e){
+			session = null;
+			response = "Failed To Connect " + e.getMessage();
+		}
+		catch (JCSMPException e) {
 			session = null;
 			response = "Failed To Connect " + e.getMessage();
 		}
@@ -87,5 +98,22 @@ public class MessageRouter {
 	}
 	public JCSMPSession getSession() {
 		return session;
+	}
+
+	private StatusReport checkSessionEligibility(){
+		String response = "";
+
+		if (session.isCapable(CapabilityType.PUB_GUARANTEED) &&
+				session.isCapable(CapabilityType.SUB_FLOW_GUARANTEED) &&
+				session.isCapable(CapabilityType.ENDPOINT_MANAGEMENT) &&
+				session.isCapable(CapabilityType.QUEUE_SUBSCRIPTIONS)) {
+				response = "All required capabilities supported!";
+
+				return new StatusReport(response, false);
+		}
+
+		response = "Capabilities not met!";
+
+		return new StatusReport(response, true);
 	}
 }
